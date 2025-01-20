@@ -7,5 +7,8 @@ import (
 func main() {
 	console := internal.NewConsole()
 	console.SetLayout()
-	console.App.Run()
+	if err := console.App.SetRoot(console.Form, true).EnableMouse(true).EnablePaste(true).Run(); err != nil {
+		panic(err)
+	}
+
 }
