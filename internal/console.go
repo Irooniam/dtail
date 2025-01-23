@@ -12,7 +12,7 @@ const (
 	DB_USER_FIELD   = "DB User"
 	DB_PASSWD_FIELD = "DB Password"
 	DB_NAME_FIELD   = "DB Name"
-	DB_TABLES_FIELD = "DB Tables"
+	DB_QUERY_FIELD  = "DB Query"
 	STATUS_FIELD    = "Status"
 	CONNECT_BUTTON  = "Connect Button"
 	SAVE_BUTTON     = "Save Button"
@@ -27,8 +27,8 @@ type Console struct {
 	User   *tview.InputField
 	Passwd *tview.InputField
 	DBName *tview.InputField
-	Tables *tview.DropDown
-	Status *tview.InputField
+	Query  *tview.TextArea
+	Status *tview.TextArea
 }
 
 func NewConsole() *Console {
@@ -71,9 +71,10 @@ func (c *Console) SetLayout() {
 	c.Form.AddInputField(DB_USER_FIELD, "", 50, nil, nil)
 	c.Form.AddPasswordField(DB_PASSWD_FIELD, "", 50, '*', nil)
 	c.Form.AddInputField(DB_NAME_FIELD, "", 50, nil, nil)
-	c.Form.AddDropDown(DB_TABLES_FIELD, []string{"Connect to populate"}, 0, nil)
+	c.Form.AddTextArea(DB_QUERY_FIELD, "", 50, 10, 500, nil)
+	c.Form.AddTextArea(STATUS_FIELD, "", 50, 10, 500, nil)
+
 	c.Form.AddButton(CONNECT_BUTTON, c.Connect)
-	c.Form.AddInputField(STATUS_FIELD, "", 50, nil, nil)
 	c.Form.AddButton(SAVE_BUTTON, c.Save)
 	c.Form.AddButton(QUIT_BUTTON, c.Close)
 
@@ -83,8 +84,8 @@ func (c *Console) SetLayout() {
 	c.User = c.Form.GetFormItemByLabel(DB_USER_FIELD).(*tview.InputField)
 	c.Passwd = c.Form.GetFormItemByLabel(DB_PASSWD_FIELD).(*tview.InputField)
 	c.DBName = c.Form.GetFormItemByLabel(DB_NAME_FIELD).(*tview.InputField)
-	c.Tables = c.Form.GetFormItemByLabel(DB_TABLES_FIELD).(*tview.DropDown)
-	c.Status = c.Form.GetFormItemByLabel(STATUS_FIELD).(*tview.InputField)
+	c.Query = c.Form.GetFormItemByLabel(DB_QUERY_FIELD).(*tview.TextArea)
+	c.Status = c.Form.GetFormItemByLabel(STATUS_FIELD).(*tview.TextArea)
 
 	//status input has to be disabled as its only for print status
 	c.Status.SetDisabled(true)
