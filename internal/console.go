@@ -6,9 +6,23 @@ import (
 	"github.com/rivo/tview"
 )
 
+const (
+	DB_SYSTEM_FIELD = "DB System"
+	DB_HOST_FIELD   = "DB Host"
+	DB_USER_FIELD   = "DB User"
+	DB_PASSWD_FIELD = "DB Password"
+	DB_NAME_FIELD   = "DB Name"
+	DB_TABLES_FIELD = "DB Tables"
+	STATUS_FIELD    = "Status"
+	CONNECT_BUTTON  = "Connect Button"
+	SAVE_BUTTON     = "Save Button"
+	QUIT_BUTTON     = "Quit Button"
+)
+
 type Console struct {
 	App    *tview.Application
 	Form   *tview.Form
+	System *tview.DropDown
 	Host   *tview.InputField
 	User   *tview.InputField
 	Passwd *tview.InputField
@@ -42,34 +56,35 @@ func (c *Console) Save() {
 	c.App.Stop()
 }
 
+func (c *Console) GetValues() {
+}
+
 func (c *Console) Connect() {
-	log.Println("connecting...")
-	pass := c.Form.GetFormItemByLabel("DB Password").(*tview.InputField)
-	status := c.Form.GetFormItemByLabel("Status").(*tview.InputField)
-	status.SetText("Connecting To Database ...")
-	log.Println(pass.GetText())
+	system := c.System.GetTitle()
+	log.Println(system)
 
 }
 
 func (c *Console) SetLayout() {
-	c.Form.AddDropDown("DB System", []string{"PostgreSQL", "MySQL"}, 0, nil)
-	c.Form.AddInputField("DB Host", "", 50, nil, nil)
-	c.Form.AddInputField("DB User", "", 50, nil, nil)
-	c.Form.AddPasswordField("DB Password", "", 50, '*', nil)
-	c.Form.AddInputField("DB Name", "", 50, nil, nil)
-	c.Form.AddDropDown("DB Tables", []string{"Connect to populate"}, 0, nil)
-	c.Form.AddButton("Connect To DB", c.Connect)
-	c.Form.AddInputField("Status", "", 50, nil, nil)
-	c.Form.AddButton("Save Configuration", c.Save)
-	c.Form.AddButton("Quit", c.Close)
+	c.Form.AddDropDown(DB_SYSTEM_FIELD, []string{"PostgreSQL", "MySQL"}, 0, nil)
+	c.Form.AddInputField(DB_HOST_FIELD, "", 50, nil, nil)
+	c.Form.AddInputField(DB_USER_FIELD, "", 50, nil, nil)
+	c.Form.AddPasswordField(DB_PASSWD_FIELD, "", 50, '*', nil)
+	c.Form.AddInputField(DB_NAME_FIELD, "", 50, nil, nil)
+	c.Form.AddDropDown(DB_TABLES_FIELD, []string{"Connect to populate"}, 0, nil)
+	c.Form.AddButton(CONNECT_BUTTON, c.Connect)
+	c.Form.AddInputField(STATUS_FIELD, "", 50, nil, nil)
+	c.Form.AddButton(SAVE_BUTTON, c.Save)
+	c.Form.AddButton(QUIT_BUTTON, c.Close)
 
 	//save references to tview elements so we dont have to keep looking up
-	c.Host = c.Form.GetFormItemByLabel("DB Host").(*tview.InputField)
-	c.User = c.Form.GetFormItemByLabel("DB User").(*tview.InputField)
-	c.Passwd = c.Form.GetFormItemByLabel("DB Password").(*tview.InputField)
-	c.DBName = c.Form.GetFormItemByLabel("DB Name").(*tview.InputField)
-	c.Tables = c.Form.GetFormItemByLabel("DB Tables").(*tview.DropDown)
-	c.Status = c.Form.GetFormItemByLabel("Status").(*tview.InputField)
+	c.System = c.Form.GetFormItemByLabel(DB_SYSTEM_FIELD).(*tview.DropDown)
+	c.Host = c.Form.GetFormItemByLabel(DB_HOST_FIELD).(*tview.InputField)
+	c.User = c.Form.GetFormItemByLabel(DB_USER_FIELD).(*tview.InputField)
+	c.Passwd = c.Form.GetFormItemByLabel(DB_PASSWD_FIELD).(*tview.InputField)
+	c.DBName = c.Form.GetFormItemByLabel(DB_NAME_FIELD).(*tview.InputField)
+	c.Tables = c.Form.GetFormItemByLabel(DB_TABLES_FIELD).(*tview.DropDown)
+	c.Status = c.Form.GetFormItemByLabel(STATUS_FIELD).(*tview.InputField)
 
 	//status input has to be disabled as its only for print status
 	c.Status.SetDisabled(true)

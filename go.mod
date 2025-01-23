@@ -2,9 +2,13 @@ module github.com/Irooniam/sotailc
 
 go 1.23.4
 
-require github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
+require (
+	github.com/go-sql-driver/mysql v1.8.1
+	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
+)
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/gdamore/tcell/v2 v2.7.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
