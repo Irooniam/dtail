@@ -14,9 +14,9 @@ const (
 	DB_URI_FIELD    = "DB Connection URI"
 	DB_QUERY_FIELD  = "DB query"
 	STATUS_FIELD    = "status"
-	CONNECT_BUTTON  = "Connect Button"
-	SAVE_BUTTON     = "Save Button"
-	QUIT_BUTTON     = "Quit Button"
+	CONNECT_BUTTON  = "Connect DB"
+	SAVE_BUTTON     = "Save"
+	QUIT_BUTTON     = "Quit"
 	PGSQLOPTION     = "PostgreSQL"
 	MYSQLOPTION     = "MySQL"
 	FIELD_WIDTH     = 100
@@ -46,7 +46,7 @@ func NewConsole() *Console {
 
 func (c *Console) OpenDB() {
 	_, x := c.driver.GetCurrentOption()
-	c.status.SetText(x)
+	c.addStatus(x)
 
 	//hardcode for now
 	host := "127.0.0.1"
@@ -66,7 +66,12 @@ func (c *Console) OpenDB() {
 		return
 	}
 
-	c.status.SetText(fmt.Sprintf("Connected %s", db))
+	c.addStatus(fmt.Sprintf("Connected %s", db))
+}
+
+func (c *Console) addStatus(logline string) {
+	c.logbuf += fmt.Sprintf("%s\n", logline)
+	c.status.SetText(c.logbuf)
 }
 
 func (c *Console) Run() {
@@ -94,11 +99,14 @@ func (c *Console) Connect() {
 
 }
 
-func (c *Console) addstatus(logline string) {
-
-}
-
 func (c *Console) changeDriver(label string, index int) {
+	//check if status is nil - otherwise you get nil pointer
+	if c.status == nil {
+		return
+	}
+
+	c.addStatus(fmt.Sprintf("DB Driver: %s", label))
+
 	if label == PGSQLOPTION {
 		c.dburi.SetText("postgres://<username>:<password>@<host>/<dbname>?sslmode=<verify,disable>")
 	}
@@ -110,18 +118,20 @@ func (c *Console) changeDriver(label string, index int) {
 }
 
 func (c *Console) setLayout() {
+	c.form.AddDropDown(DB_DRIVER_FIELD, []string{PGSQLOPTION, MYSQLOPTION}, 0, c.changeDriver)
+	c.driver = c.form.GetFormItemByLabel(DB_DRIVER_FIELD).(*tview.DropDown)
 
 	c.form.AddInputField(DB_URI_FIELD, "", FIELD_WIDTH, nil, nil)
 	c.dburi = c.form.GetFormItemByLabel(DB_URI_FIELD).(*tview.InputField)
-
-	c.form.AddDropDown(DB_DRIVER_FIELD, []string{PGSQLOPTION, MYSQLOPTION}, 0, c.changeDriver)
-	c.driver = c.form.GetFormItemByLabel(DB_DRIVER_FIELD).(*tview.DropDown)
 
 	c.form.AddTextArea(DB_QUERY_FIELD, "", FIELD_WIDTH, 10, 500, nil)
 	c.query = c.form.GetFormItemByLabel(DB_QUERY_FIELD).(*tview.TextArea)
 
 	c.form.AddTextView(STATUS_FIELD, "", FIELD_WIDTH, 10, false, true)
 	c.status = c.form.GetFormItemByLabel(STATUS_FIELD).(*tview.TextView)
+
+	//at startup set default driver
+	c.changeDriver(PGSQLOPTION, 0)
 
 	c.form.AddButton(CONNECT_BUTTON, c.Connect)
 	c.form.AddButton(SAVE_BUTTON, c.Save)
