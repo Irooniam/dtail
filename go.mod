@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/go-sql-driver/mysql v1.8.1
+	github.com/lib/pq v1.10.9
 	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
 )
 

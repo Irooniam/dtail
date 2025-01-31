@@ -1,95 +1,130 @@
 package internal
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 
+	_ "github.com/lib/pq"
 	"github.com/rivo/tview"
 )
 
 const (
-	DB_SYSTEM_FIELD = "DB System"
-	DB_HOST_FIELD   = "DB Host"
-	DB_USER_FIELD   = "DB User"
-	DB_PASSWD_FIELD = "DB Password"
-	DB_NAME_FIELD   = "DB Name"
-	DB_QUERY_FIELD  = "DB Query"
-	STATUS_FIELD    = "Status"
+	DB_DRIVER_FIELD = "DB driver"
+	DB_URI_FIELD    = "DB Connection URI"
+	DB_QUERY_FIELD  = "DB query"
+	STATUS_FIELD    = "status"
 	CONNECT_BUTTON  = "Connect Button"
 	SAVE_BUTTON     = "Save Button"
 	QUIT_BUTTON     = "Quit Button"
+	PGSQLOPTION     = "PostgreSQL"
+	MYSQLOPTION     = "MySQL"
+	FIELD_WIDTH     = 100
 )
 
 type Console struct {
-	App    *tview.Application
-	Form   *tview.Form
-	System *tview.DropDown
-	Host   *tview.InputField
-	User   *tview.InputField
-	Passwd *tview.InputField
-	DBName *tview.InputField
-	Query  *tview.TextArea
-	Status *tview.TextArea
+	app    *tview.Application
+	form   *tview.Form
+	driver *tview.DropDown
+	dburi  *tview.InputField
+	query  *tview.TextArea
+	status *tview.TextView
+	db     *sql.DB
+	logbuf string
 }
 
 func NewConsole() *Console {
-	log.Println("new console...")
-
 	app := tview.NewApplication()
 	form := tview.NewForm()
-	//app.SetRoot(form, true).EnableMouse(true).EnablePaste(true)
-	//app.SetRoot(form, true).EnablePaste(true)
 
 	return &Console{
-		App:  app,
-		Form: form,
+		app:  app,
+		form: form,
 	}
 
 }
 
+func (c *Console) OpenDB() {
+	_, x := c.driver.GetCurrentOption()
+	c.status.SetText(x)
+
+	//hardcode for now
+	host := "127.0.0.1"
+	user := "graph"
+	passwd := "graph"
+	dbname := "graph"
+
+	uri := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, passwd, host, "5432", dbname)
+	db, err := NewDB("postgres", uri)
+	if err != nil {
+		c.status.SetText(fmt.Sprintf("Tried opening DB but got error: %s", err))
+		return
+	}
+
+	if err := db.Ping(); err != nil {
+		c.status.SetText(fmt.Sprintf("Tried to ping DB but got error %s", err))
+		return
+	}
+
+	c.status.SetText(fmt.Sprintf("Connected %s", db))
+}
+
+func (c *Console) Run() {
+	c.setLayout()
+	if err := c.app.SetRoot(c.form, true).EnableMouse(true).EnablePaste(true).Run(); err != nil {
+		panic(err)
+	}
+}
+
 func (c *Console) Close() {
 	log.Println("closing app...")
-	c.App.Stop()
+	c.app.Stop()
 }
 
 func (c *Console) Save() {
 	log.Println("saving config...")
-	c.App.Stop()
+	c.app.Stop()
 }
 
 func (c *Console) GetValues() {
 }
 
 func (c *Console) Connect() {
-	system := c.System.GetTitle()
-	log.Println(system)
+	c.OpenDB()
 
 }
 
-func (c *Console) SetLayout() {
-	c.Form.AddDropDown(DB_SYSTEM_FIELD, []string{"PostgreSQL", "MySQL"}, 0, nil)
-	c.Form.AddInputField(DB_HOST_FIELD, "", 50, nil, nil)
-	c.Form.AddInputField(DB_USER_FIELD, "", 50, nil, nil)
-	c.Form.AddPasswordField(DB_PASSWD_FIELD, "", 50, '*', nil)
-	c.Form.AddInputField(DB_NAME_FIELD, "", 50, nil, nil)
-	c.Form.AddTextArea(DB_QUERY_FIELD, "", 50, 10, 500, nil)
-	c.Form.AddTextArea(STATUS_FIELD, "", 50, 10, 500, nil)
+func (c *Console) addstatus(logline string) {
 
-	c.Form.AddButton(CONNECT_BUTTON, c.Connect)
-	c.Form.AddButton(SAVE_BUTTON, c.Save)
-	c.Form.AddButton(QUIT_BUTTON, c.Close)
+}
 
-	//save references to tview elements so we dont have to keep looking up
-	c.System = c.Form.GetFormItemByLabel(DB_SYSTEM_FIELD).(*tview.DropDown)
-	c.Host = c.Form.GetFormItemByLabel(DB_HOST_FIELD).(*tview.InputField)
-	c.User = c.Form.GetFormItemByLabel(DB_USER_FIELD).(*tview.InputField)
-	c.Passwd = c.Form.GetFormItemByLabel(DB_PASSWD_FIELD).(*tview.InputField)
-	c.DBName = c.Form.GetFormItemByLabel(DB_NAME_FIELD).(*tview.InputField)
-	c.Query = c.Form.GetFormItemByLabel(DB_QUERY_FIELD).(*tview.TextArea)
-	c.Status = c.Form.GetFormItemByLabel(STATUS_FIELD).(*tview.TextArea)
+func (c *Console) changeDriver(label string, index int) {
+	if label == PGSQLOPTION {
+		c.dburi.SetText("postgres://<username>:<password>@<host>/<dbname>?sslmode=<verify,disable>")
+	}
 
-	//status input has to be disabled as its only for print status
-	c.Status.SetDisabled(true)
+	if label == MYSQLOPTION {
+		c.dburi.SetText("<username>:<password>@<host:port>/<dbname>?<paramN=valueN,...>")
+	}
+	c.app.SetFocus(c.dburi)
+}
 
-	//set focus to first input
-	c.App.SetFocus(c.Form.GetFormItemByLabel("DB Host"))
+func (c *Console) setLayout() {
+
+	c.form.AddInputField(DB_URI_FIELD, "", FIELD_WIDTH, nil, nil)
+	c.dburi = c.form.GetFormItemByLabel(DB_URI_FIELD).(*tview.InputField)
+
+	c.form.AddDropDown(DB_DRIVER_FIELD, []string{PGSQLOPTION, MYSQLOPTION}, 0, c.changeDriver)
+	c.driver = c.form.GetFormItemByLabel(DB_DRIVER_FIELD).(*tview.DropDown)
+
+	c.form.AddTextArea(DB_QUERY_FIELD, "", FIELD_WIDTH, 10, 500, nil)
+	c.query = c.form.GetFormItemByLabel(DB_QUERY_FIELD).(*tview.TextArea)
+
+	c.form.AddTextView(STATUS_FIELD, "", FIELD_WIDTH, 10, false, true)
+	c.status = c.form.GetFormItemByLabel(STATUS_FIELD).(*tview.TextView)
+
+	c.form.AddButton(CONNECT_BUTTON, c.Connect)
+	c.form.AddButton(SAVE_BUTTON, c.Save)
+	c.form.AddButton(QUIT_BUTTON, c.Close)
+
 }
