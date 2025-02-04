@@ -15,10 +15,11 @@ const (
 	DB_QUERY_FIELD  = "DB query"
 	STATUS_FIELD    = "status"
 	CONNECT_BUTTON  = "Connect DB"
+	TABLES_BUTTON   = "List Tables"
 	SAVE_BUTTON     = "Save"
 	QUIT_BUTTON     = "Quit"
-	PGSQLOPTION     = "PostgreSQL"
-	MYSQLOPTION     = "MySQL"
+	PGSQLOPTION     = "postgres"
+	MYSQLOPTION     = "mysql"
 	FIELD_WIDTH     = 100
 )
 
@@ -33,6 +34,10 @@ type Console struct {
 	logbuf string
 }
 
+type dbInter interface {
+	getTables() ([]string, error)
+}
+
 func NewConsole() *Console {
 	app := tview.NewApplication()
 	form := tview.NewForm()
@@ -45,33 +50,62 @@ func NewConsole() *Console {
 }
 
 func (c *Console) OpenDB() {
-	_, x := c.driver.GetCurrentOption()
-	c.addStatus(x)
+	_, driver := c.driver.GetCurrentOption()
+	c.addStatus(fmt.Sprintf("Preparing to connect to database server using %s driver", driver))
 
-	//hardcode for now
-	host := "127.0.0.1"
-	user := "graph"
-	passwd := "graph"
-	dbname := "graph"
-
-	uri := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, passwd, host, "5432", dbname)
-	db, err := NewDB("postgres", uri)
+	db, err := NewDB(driver, c.dburi.GetText())
 	if err != nil {
-		c.status.SetText(fmt.Sprintf("Tried opening DB but got error: %s", err))
+		c.addStatus(fmt.Sprintf("Tried opening DB with driver %s but got error: %s", driver, err))
 		return
 	}
 
+	c.addStatus("Successfully connected to server")
+	c.addStatus("Trying to access database...")
+
+	//make sure we actually have access
 	if err := db.Ping(); err != nil {
-		c.status.SetText(fmt.Sprintf("Tried to ping DB but got error %s", err))
+		c.addStatus(fmt.Sprintf("Tried to ping DB but got error %s", err))
 		return
 	}
 
-	c.addStatus(fmt.Sprintf("Connected %s", db))
+	stats := db.Stats()
+	c.addStatus("Successfully connected to database")
+	c.addStatus(fmt.Sprintf("Current open database connections %d", stats.OpenConnections))
+	c.db = db
+
+	//now enable list tables button
+}
+
+func (c *Console) listTables() {
+	_, driver := c.driver.GetCurrentOption()
+
+	//setup interface
+	var dbc dbInter
+	if driver == PGSQLOPTION {
+		dbc = newPG(c.db)
+	}
+
+	if driver == MYSQLOPTION {
+		dbc = newMY(c.db)
+	}
+
+	dbc = newMY(c.db)
+	tables, err := dbc.getTables()
+	if err != nil {
+		c.addStatus(fmt.Sprintf("Tried to list tables in DB but got error %s", err))
+		return
+	}
+
+	c.addStatus(fmt.Sprintf("Got %d tables", len(tables)))
+	for _, v := range tables {
+		c.addStatus(fmt.Sprintf("Table %s", v))
+	}
 }
 
 func (c *Console) addStatus(logline string) {
 	c.logbuf += fmt.Sprintf("%s\n", logline)
 	c.status.SetText(c.logbuf)
+	c.status.ScrollToEnd()
 }
 
 func (c *Console) Run() {
@@ -105,16 +139,25 @@ func (c *Console) changeDriver(label string, index int) {
 		return
 	}
 
+	//var DB *sql.DB
 	c.addStatus(fmt.Sprintf("DB Driver: %s", label))
 
 	if label == PGSQLOPTION {
-		c.dburi.SetText("postgres://<username>:<password>@<host>/<dbname>?sslmode=<verify,disable>")
+		//c.dburi.SetText("postgres://<username>:<password>@<host>/<dbname>?sslmode=<verify,disable>")
+		//hack for now
+		connuri := "postgres://graph:graph@127.0.0.1:5432/graph?sslmode=disable"
+		c.dburi.SetText(connuri)
 	}
 
 	if label == MYSQLOPTION {
 		c.dburi.SetText("<username>:<password>@<host:port>/<dbname>?<paramN=valueN,...>")
 	}
 	c.app.SetFocus(c.dburi)
+}
+
+func (c *Console) DisableButton(label string, disable bool) {
+	b := c.form.GetButtonIndex(label)
+	c.form.GetButton(b).SetDisabled(disable)
 }
 
 func (c *Console) setLayout() {
@@ -127,14 +170,21 @@ func (c *Console) setLayout() {
 	c.form.AddTextArea(DB_QUERY_FIELD, "", FIELD_WIDTH, 10, 500, nil)
 	c.query = c.form.GetFormItemByLabel(DB_QUERY_FIELD).(*tview.TextArea)
 
-	c.form.AddTextView(STATUS_FIELD, "", FIELD_WIDTH, 10, false, true)
+	c.form.AddTextView(STATUS_FIELD, "", FIELD_WIDTH, 10, true, true)
 	c.status = c.form.GetFormItemByLabel(STATUS_FIELD).(*tview.TextView)
+	c.status.SetScrollable(true)
+	c.status.ScrollToEnd()
 
 	//at startup set default driver
 	c.changeDriver(PGSQLOPTION, 0)
 
 	c.form.AddButton(CONNECT_BUTTON, c.Connect)
+	c.form.AddButton(TABLES_BUTTON, c.listTables)
 	c.form.AddButton(SAVE_BUTTON, c.Save)
 	c.form.AddButton(QUIT_BUTTON, c.Close)
+
+	//disable listing tables until we have connection
+	c.DisableButton(TABLES_BUTTON, true)
+	c.DisableButton(SAVE_BUTTON, true)
 
 }
