@@ -10,25 +10,26 @@ import (
 )
 
 const (
-	DB_DRIVER_FIELD = "DB driver"
-	DB_URI_FIELD    = "DB Connection URI"
-	DB_QUERY_FIELD  = "DB query"
-	STATUS_FIELD    = "status"
-	CONNECT_BUTTON  = "Connect DB"
-	TABLES_BUTTON   = "List Tables"
-	SAVE_BUTTON     = "Save"
-	QUIT_BUTTON     = "Quit"
-	PGSQLOPTION     = "postgres"
-	MYSQLOPTION     = "mysql"
-	FIELD_WIDTH     = 100
+	DB_DRIVER_FIELD   = "DB driver"
+	DB_URI_FIELD      = "DB Connection URI"
+	DB_QUERY_FIELD    = "DB query"
+	STATUS_FIELD      = "status"
+	CONNECT_BUTTON    = "Connect DB"
+	TABLES_BUTTON     = "Choose Table"
+	TABLES_LIST_FIELD = "Tables"
+	SAVE_BUTTON       = "Save"
+	QUIT_BUTTON       = "Quit"
+	PGSQLOPTION       = "postgres"
+	MYSQLOPTION       = "mysql"
+	FIELD_WIDTH       = 100
 )
 
 type Console struct {
 	app    *tview.Application
 	form   *tview.Form
-	driver *tview.DropDown
+	driver *tview.InputField
 	dburi  *tview.InputField
-	query  *tview.TextArea
+	tables *tview.DropDown
 	status *tview.TextView
 	db     *sql.DB
 	logbuf string
@@ -50,7 +51,7 @@ func NewConsole() *Console {
 }
 
 func (c *Console) OpenDB() {
-	_, driver := c.driver.GetCurrentOption()
+	driver := c.driver.GetText()
 	c.addStatus(fmt.Sprintf("Preparing to connect to database server using %s driver", driver))
 
 	db, err := NewDB(driver, c.dburi.GetText())
@@ -58,9 +59,6 @@ func (c *Console) OpenDB() {
 		c.addStatus(fmt.Sprintf("Tried opening DB with driver %s but got error: %s", driver, err))
 		return
 	}
-
-	c.addStatus("Successfully connected to server")
-	c.addStatus("Trying to access database...")
 
 	//make sure we actually have access
 	if err := db.Ping(); err != nil {
@@ -74,32 +72,46 @@ func (c *Console) OpenDB() {
 	c.db = db
 
 	//now enable list tables button
+	c.listTables()
+	c.DisableButton(TABLES_BUTTON, false)
+	c.DisableButton(CONNECT_BUTTON, true)
 }
 
 func (c *Console) listTables() {
-	_, driver := c.driver.GetCurrentOption()
+	driver := c.driver.GetText()
 
-	//setup interface
+	//setup interface so its flexible and can add other dbs in future
 	var dbc dbInter
 	if driver == PGSQLOPTION {
 		dbc = newPG(c.db)
 	}
 
-	if driver == MYSQLOPTION {
-		dbc = newMY(c.db)
-	}
-
-	dbc = newMY(c.db)
 	tables, err := dbc.getTables()
 	if err != nil {
 		c.addStatus(fmt.Sprintf("Tried to list tables in DB but got error %s", err))
 		return
 	}
 
-	c.addStatus(fmt.Sprintf("Got %d tables", len(tables)))
-	for _, v := range tables {
-		c.addStatus(fmt.Sprintf("Table %s", v))
+	//remove all options and start fresh
+	for i := 0; i < c.tables.GetOptionCount(); i++ {
+		c.tables.RemoveOption(i)
 	}
+
+	c.addStatus(fmt.Sprintf("Found %d tables", len(tables)))
+	c.tables.SetDisabled(false)
+	for _, v := range tables {
+		c.tables.AddOption(v, nil)
+	}
+
+	//make sure we have tables before setting default
+	if len(tables) > 0 {
+		c.tables.SetCurrentOption(0)
+	}
+}
+
+func (c *Console) saveTable() {
+	_, table := c.tables.GetCurrentOption()
+	c.addStatus(fmt.Sprintf("Creating triggers for table %s", table))
 }
 
 func (c *Console) addStatus(logline string) {
@@ -133,26 +145,9 @@ func (c *Console) Connect() {
 
 }
 
-func (c *Console) changeDriver(label string, index int) {
-	//check if status is nil - otherwise you get nil pointer
-	if c.status == nil {
-		return
-	}
-
-	//var DB *sql.DB
-	c.addStatus(fmt.Sprintf("DB Driver: %s", label))
-
-	if label == PGSQLOPTION {
-		//c.dburi.SetText("postgres://<username>:<password>@<host>/<dbname>?sslmode=<verify,disable>")
-		//hack for now
-		connuri := "postgres://graph:graph@127.0.0.1:5432/graph?sslmode=disable"
-		c.dburi.SetText(connuri)
-	}
-
-	if label == MYSQLOPTION {
-		c.dburi.SetText("<username>:<password>@<host:port>/<dbname>?<paramN=valueN,...>")
-	}
-	c.app.SetFocus(c.dburi)
+func (c *Console) chooseTable() {
+	_, table := c.tables.GetCurrentOption()
+	c.addStatus(fmt.Sprintf("Creating triggers for table %s", table))
 }
 
 func (c *Console) DisableButton(label string, disable bool) {
@@ -161,14 +156,23 @@ func (c *Console) DisableButton(label string, disable bool) {
 }
 
 func (c *Console) setLayout() {
-	c.form.AddDropDown(DB_DRIVER_FIELD, []string{PGSQLOPTION, MYSQLOPTION}, 0, c.changeDriver)
-	c.driver = c.form.GetFormItemByLabel(DB_DRIVER_FIELD).(*tview.DropDown)
+	//hardcode driver as we only support pgsql at the mo
+	c.form.AddInputField(DB_DRIVER_FIELD, "postgres", FIELD_WIDTH, nil, nil)
+	c.driver = c.form.GetFormItemByLabel(DB_DRIVER_FIELD).(*tview.InputField)
+	c.driver.SetDisabled(true)
 
+	//connection string
 	c.form.AddInputField(DB_URI_FIELD, "", FIELD_WIDTH, nil, nil)
 	c.dburi = c.form.GetFormItemByLabel(DB_URI_FIELD).(*tview.InputField)
+	c.dburi.SetText("postgres://<username>:<password>@<host>/<dbname>?sslmode=<verify,disable>")
 
-	c.form.AddTextArea(DB_QUERY_FIELD, "", FIELD_WIDTH, 10, 500, nil)
-	c.query = c.form.GetFormItemByLabel(DB_QUERY_FIELD).(*tview.TextArea)
+	// ############ hack for now
+	c.dburi.SetText("postgres://graph:graph@127.0.0.1/graph?sslmode=disable")
+
+	//tables dropdown
+	c.form.AddDropDown(TABLES_LIST_FIELD, []string{"None"}, 0, nil)
+	c.tables = c.form.GetFormItemByLabel(TABLES_LIST_FIELD).(*tview.DropDown)
+	c.tables.SetDisabled(true)
 
 	c.form.AddTextView(STATUS_FIELD, "", FIELD_WIDTH, 10, true, true)
 	c.status = c.form.GetFormItemByLabel(STATUS_FIELD).(*tview.TextView)
@@ -176,10 +180,9 @@ func (c *Console) setLayout() {
 	c.status.ScrollToEnd()
 
 	//at startup set default driver
-	c.changeDriver(PGSQLOPTION, 0)
 
 	c.form.AddButton(CONNECT_BUTTON, c.Connect)
-	c.form.AddButton(TABLES_BUTTON, c.listTables)
+	c.form.AddButton(TABLES_BUTTON, c.chooseTable)
 	c.form.AddButton(SAVE_BUTTON, c.Save)
 	c.form.AddButton(QUIT_BUTTON, c.Close)
 
