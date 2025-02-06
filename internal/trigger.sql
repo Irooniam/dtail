@@ -1,12 +1,12 @@
-CREATE OR REPLACE FUNCTION notify_my_table_update() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION dtail_%s_update() RETURNS TRIGGER AS $$
 	DECLARE
 		row json;
 		op text;
 
     	BEGIN
-		op = '{"op":"' || TG_OP || '"}';
+		op = '{"op":"' || TG_OP || '", "table":"%s"}';
 		row = op::jsonb || row_to_json(NEW)::jsonb;
-    		PERFORM pg_notify('my_table_update', row::text);
+    		PERFORM pg_notify('dtail_table_update', row::text);
 		RETURN NEW;
     	END;
 

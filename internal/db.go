@@ -3,6 +3,7 @@ package internal
 import (
 	"database/sql"
 	_ "embed"
+	"fmt"
 	"log"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -23,10 +24,20 @@ func newPG(db *sql.DB) *pgDB {
 
 }
 
-func (p *pgDB) createTriggers() error {
-	log.Println(TRIGGER_SQL)
-	log.Println(NOTIFY_SQL)
-	log.Println("pg trigger")
+func (p *pgDB) createTriggers(table string) error {
+	sql := fmt.Sprintf(TRIGGER_SQL, table, table)
+	_, err := p.Exec(sql)
+	if err != nil {
+		return err
+	}
+
+	//now re/create notification trigger
+	sql = fmt.Sprintf(NOTIFY_SQL, table, table, table)
+	_, err = p.Exec(sql)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

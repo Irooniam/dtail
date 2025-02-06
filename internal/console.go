@@ -36,7 +36,7 @@ type Console struct {
 
 type dbInter interface {
 	getTables() ([]string, error)
-	createTriggers() error
+	createTriggers(table string) error
 }
 
 func NewConsole() *Console {
@@ -110,13 +110,6 @@ func (c *Console) listTables() {
 func (c *Console) saveTable() {
 	_, table := c.tables.GetCurrentOption()
 	c.addStatus(fmt.Sprintf("Saving configuration for table %s", table))
-
-	err := c.dbc.createTriggers()
-	if err != nil {
-		c.addStatus(fmt.Sprintf("Tried creating triggers but got error: %s", err))
-		return
-	}
-
 	c.addStatus("we are good")
 }
 
@@ -155,7 +148,7 @@ func (c *Console) chooseTable() {
 	_, table := c.tables.GetCurrentOption()
 	c.addStatus(fmt.Sprintf("Creating triggers for table %s", table))
 
-	if err := c.dbc.createTriggers(); err != nil {
+	if err := c.dbc.createTriggers(table); err != nil {
 		c.addStatus(fmt.Sprintf("Tried to create triggers but got error: %s", err))
 	}
 }

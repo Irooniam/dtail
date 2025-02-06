@@ -1,5 +1,5 @@
-CREATE TRIGGER trigger_my_table_update
+CREATE OR REPLACE TRIGGER trigger_dtail_%s_update
   AFTER INSERT OR UPDATE OR DELETE
-  ON my_table
+  ON %s 
   FOR EACH ROW
-  EXECUTE PROCEDURE notify_my_table_update();
+  EXECUTE PROCEDURE dtail_%s_update();
