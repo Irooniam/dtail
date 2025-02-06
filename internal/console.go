@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
@@ -31,12 +30,13 @@ type Console struct {
 	dburi  *tview.InputField
 	tables *tview.DropDown
 	status *tview.TextView
-	db     *sql.DB
+	dbc    dbInter
 	logbuf string
 }
 
 type dbInter interface {
 	getTables() ([]string, error)
+	createTriggers() error
 }
 
 func NewConsole() *Console {
@@ -69,7 +69,13 @@ func (c *Console) OpenDB() {
 	stats := db.Stats()
 	c.addStatus("Successfully connected to database")
 	c.addStatus(fmt.Sprintf("Current open database connections %d", stats.OpenConnections))
-	c.db = db
+
+	var dbc dbInter
+	if driver == PGSQLOPTION {
+		dbc = newPG(db)
+	}
+
+	c.dbc = dbc
 
 	//now enable list tables button
 	c.listTables()
@@ -78,15 +84,7 @@ func (c *Console) OpenDB() {
 }
 
 func (c *Console) listTables() {
-	driver := c.driver.GetText()
-
-	//setup interface so its flexible and can add other dbs in future
-	var dbc dbInter
-	if driver == PGSQLOPTION {
-		dbc = newPG(c.db)
-	}
-
-	tables, err := dbc.getTables()
+	tables, err := c.dbc.getTables()
 	if err != nil {
 		c.addStatus(fmt.Sprintf("Tried to list tables in DB but got error %s", err))
 		return
@@ -111,7 +109,15 @@ func (c *Console) listTables() {
 
 func (c *Console) saveTable() {
 	_, table := c.tables.GetCurrentOption()
-	c.addStatus(fmt.Sprintf("Creating triggers for table %s", table))
+	c.addStatus(fmt.Sprintf("Saving configuration for table %s", table))
+
+	err := c.dbc.createTriggers()
+	if err != nil {
+		c.addStatus(fmt.Sprintf("Tried creating triggers but got error: %s", err))
+		return
+	}
+
+	c.addStatus("we are good")
 }
 
 func (c *Console) addStatus(logline string) {
@@ -148,6 +154,10 @@ func (c *Console) Connect() {
 func (c *Console) chooseTable() {
 	_, table := c.tables.GetCurrentOption()
 	c.addStatus(fmt.Sprintf("Creating triggers for table %s", table))
+
+	if err := c.dbc.createTriggers(); err != nil {
+		c.addStatus(fmt.Sprintf("Tried to create triggers but got error: %s", err))
+	}
 }
 
 func (c *Console) DisableButton(label string, disable bool) {

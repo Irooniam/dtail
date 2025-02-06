@@ -8,6 +8,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+//go:embed trigger.sql
+var TRIGGER_SQL string
+
+//go:embed notify.sql
+var NOTIFY_SQL string
+
 type pgDB struct {
 	*sql.DB
 }
@@ -18,6 +24,8 @@ func newPG(db *sql.DB) *pgDB {
 }
 
 func (p *pgDB) createTriggers() error {
+	log.Println(TRIGGER_SQL)
+	log.Println(NOTIFY_SQL)
 	log.Println("pg trigger")
 	return nil
 }
