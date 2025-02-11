@@ -1,12 +1,17 @@
 package internal
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
+	"os"
 
 	_ "github.com/lib/pq"
 	"github.com/rivo/tview"
 )
+
+//go:embed env_config
+var CONFIG string
 
 const (
 	DB_DRIVER_FIELD   = "DB driver"
@@ -21,6 +26,7 @@ const (
 	PGSQLOPTION       = "postgres"
 	MYSQLOPTION       = "mysql"
 	FIELD_WIDTH       = 100
+	CONFIG_LISTEN     = "dtail_table_update"
 )
 
 type Console struct {
@@ -110,7 +116,15 @@ func (c *Console) listTables() {
 func (c *Console) saveTable() {
 	_, table := c.tables.GetCurrentOption()
 	c.addStatus(fmt.Sprintf("Saving configuration for table %s", table))
-	c.addStatus("we are good")
+
+	out := fmt.Sprintf(CONFIG, c.dburi.GetText(), CONFIG_LISTEN)
+	err := os.WriteFile(".env", []byte(out), 0644)
+	if err != nil {
+		c.addStatus(fmt.Sprintf("Tried saving file to .env but got error: %s", err))
+		return
+	}
+
+	c.addStatus("Saved configuration file to .env")
 }
 
 func (c *Console) addStatus(logline string) {
@@ -151,6 +165,10 @@ func (c *Console) chooseTable() {
 	if err := c.dbc.createTriggers(table); err != nil {
 		c.addStatus(fmt.Sprintf("Tried to create triggers but got error: %s", err))
 	}
+
+	c.addStatus("Triggers created successfully")
+	c.DisableButton(TABLES_BUTTON, true)
+	c.DisableButton(SAVE_BUTTON, false)
 }
 
 func (c *Console) DisableButton(label string, disable bool) {
@@ -186,7 +204,7 @@ func (c *Console) setLayout() {
 
 	c.form.AddButton(CONNECT_BUTTON, c.Connect)
 	c.form.AddButton(TABLES_BUTTON, c.chooseTable)
-	c.form.AddButton(SAVE_BUTTON, c.Save)
+	c.form.AddButton(SAVE_BUTTON, c.saveTable)
 	c.form.AddButton(QUIT_BUTTON, c.Close)
 
 	//disable listing tables until we have connection

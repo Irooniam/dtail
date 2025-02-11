@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -27,12 +26,12 @@ func (r *Runner) Run() {
 	for {
 		select {
 		case event := <-r.Notify:
-			fmt.Println("received notification, new work available", event.Extra)
+			log.Println("received notification: ", event.Extra)
 
 		//havent received events - ping db to make sure its all good
 		case <-time.After(60 * time.Second):
 			go r.Ping()
-			fmt.Println("havent received any events - pinging db")
+			log.Println("havent received any events - pinging db")
 		}
 
 	}
