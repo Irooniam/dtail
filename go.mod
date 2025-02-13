@@ -3,9 +3,12 @@ module github.com/Irooniam/sotailc
 go 1.23
 
 require (
+	github.com/coder/websocket v1.8.12
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/lib/pq v1.10.9
 	github.com/rivo/tview v0.0.0-20241227133733-17b7edb88c57
+	go.starlark.net v0.0.0-20250205221240-492d3672b3f4
+	golang.org/x/time v0.10.0
 )
 
 require (
@@ -18,4 +21,5 @@ require (
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/term v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 )
