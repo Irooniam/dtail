@@ -7,15 +7,18 @@ import (
 )
 
 func main() {
-	/*
-		connstr := "postgres://graph:graph@127.0.0.1/graph?sslmode=disable"
-		runner := server.NewRunner(connstr)
-		log.Println("Starting to listen for events...")
-		runner.Run()
-	*/
+	//how notify service and ws server will communicate
+	ch := make(chan string)
 
-	ws := server.NewWS()
+	connstr := "postgres://graph:graph@127.0.0.1/graph?sslmode=disable"
+	runner := server.NewRunner(ch, connstr)
+	log.Println("Starting to listen for events...")
+	go runner.Run()
+
+	ws := server.NewWS(ch)
 	go ws.Heartbeat()
+	go ws.ReceiveMsg()
+
 	err := ws.Start()
 	if err != nil {
 		log.Fatal(err)

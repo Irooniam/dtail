@@ -20,6 +20,7 @@ import (
 type WS struct {
 	conns  *sync.Map //key will be *websocket.Conn
 	server *http.Server
+	ch     chan string
 }
 
 func (ws *WS) hand(w http.ResponseWriter, r *http.Request) {
@@ -52,16 +53,13 @@ func (ws *WS) hand(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func NewWS() *WS {
+func NewWS(ch chan string) *WS {
 	conns := &sync.Map{}
-	//go ws.heartbeat()
-	//go ws.RouterRunner()
-	//go ws.conncount()
-
 	connuri := fmt.Sprintf("0.0.0.0:9999")
 
 	ws := WS{}
 	ws.conns = conns
+	ws.ch = ch
 
 	webserver := &http.Server{}
 	webserver.Addr = connuri
@@ -100,25 +98,42 @@ func (ws *WS) Start() error {
 	return nil
 }
 
+func (ws *WS) ReceiveMsg() {
+	log.Println("Receive Msg running...")
+	var err error
+	for msg := range ws.ch {
+		if err = ws.SendMsg(msg); err != nil {
+			log.Println("tried sending messages to client but to ", err)
+			continue
+		}
+	}
+}
+
 func (ws *WS) SendMsg(s string) error {
 	var err error = nil
+	var i int
 	ws.conns.Range(func(k, v interface{}) bool {
-		log.Printf("Sending message to client %s with payload %s", v.(*websocket.Conn).Subprotocol(), s)
+		log.Printf("Sending msg to client %s with payload %s", v.(*websocket.Conn).Subprotocol(), s)
 		err = v.(*websocket.Conn).Write(context.Background(), websocket.MessageText, []byte(s))
 		if err != nil {
 			log.Println(err)
 			ws.disconnect(v.(*websocket.Conn))
 			return false
 		}
+		i++
 		return true
 	})
 
+	//only log if we have connections
+	if i > 0 {
+		log.Printf("sent message to %d clients\n", i)
+	}
 	return err
 }
 
 func (ws *WS) Heartbeat() error {
 	for {
-		log.Println("sending heartbeat to all connections")
+		log.Println("send heartbeat to all clients")
 		if err := ws.SendMsg("h"); err != nil {
 			log.Println(err)
 		}

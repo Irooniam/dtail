@@ -8,7 +8,8 @@ import (
 )
 
 type Runner struct {
-	*pq.Listener
+	pl *pq.Listener
+	ch chan string
 }
 
 func (r *Runner) Errors(ev pq.ListenerEventType, err error) {
@@ -18,19 +19,19 @@ func (r *Runner) Errors(ev pq.ListenerEventType, err error) {
 }
 
 func (r *Runner) Run() {
-	err := r.Listen("dtail_table_update")
+	err := r.pl.Listen("dtail_table_update")
 	if err != nil {
 		panic(err)
 	}
 
 	for {
 		select {
-		case event := <-r.Notify:
-			log.Println("received notification: ", event.Extra)
-
+		case event := <-r.pl.Notify:
+			log.Println("DB notification: ", event.Extra)
+			r.ch <- string(event.Extra)
 		//havent received events - ping db to make sure its all good
 		case <-time.After(60 * time.Second):
-			go r.Ping()
+			go r.pl.Ping()
 			log.Println("havent received any events - pinging db")
 		}
 
@@ -44,9 +45,9 @@ func runnerError(ev pq.ListenerEventType, err error) {
 	}
 }
 
-func NewRunner(connstr string) *Runner {
+func NewRunner(ch chan string, connstr string) *Runner {
 	minReInterval := 5 * time.Second
 	maxReInterval := 2 * time.Minute
 
-	return &Runner{pq.NewListener(connstr, minReInterval, maxReInterval, runnerError)}
+	return &Runner{ch: ch, pl: pq.NewListener(connstr, minReInterval, maxReInterval, runnerError)}
 }
