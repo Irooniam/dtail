@@ -11,11 +11,15 @@ import (
 
 	"net/http"
 
+	_ "embed"
 	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 )
+
+//go:embed ws_client.html
+var WS_CLIENT_HTML string
 
 type WS struct {
 	conns  *sync.Map //key will be *websocket.Conn
@@ -23,7 +27,16 @@ type WS struct {
 	ch     chan string
 }
 
+// single http handler to rule them all
 func (ws *WS) hand(w http.ResponseWriter, r *http.Request) {
+	//only answer on /demo for html - otherwise ws
+	if r.RequestURI == "/demo" {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(WS_CLIENT_HTML))
+		log.Println("request for html page")
+		return
+	}
+
 	wsKey := r.Header.Get("Sec-WebSocket-Key")
 	rt := context.WithValue(r.Context(), "websocket-key", wsKey)
 	c, err := websocket.Accept(w, r.WithContext(rt), &websocket.AcceptOptions{

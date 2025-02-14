@@ -8,8 +8,9 @@ import (
 )
 
 type Runner struct {
-	pl *pq.Listener
-	ch chan string
+	pl       *pq.Listener
+	notifych string
+	ch       chan string
 }
 
 func (r *Runner) Errors(ev pq.ListenerEventType, err error) {
@@ -19,7 +20,7 @@ func (r *Runner) Errors(ev pq.ListenerEventType, err error) {
 }
 
 func (r *Runner) Run() {
-	err := r.pl.Listen("dtail_table_update")
+	err := r.pl.Listen(r.notifych)
 	if err != nil {
 		panic(err)
 	}
@@ -45,9 +46,9 @@ func runnerError(ev pq.ListenerEventType, err error) {
 	}
 }
 
-func NewRunner(ch chan string, connstr string) *Runner {
+func NewRunner(ch chan string, connstr string, listench string) *Runner {
 	minReInterval := 5 * time.Second
 	maxReInterval := 2 * time.Minute
 
-	return &Runner{ch: ch, pl: pq.NewListener(connstr, minReInterval, maxReInterval, runnerError)}
+	return &Runner{ch: ch, pl: pq.NewListener(connstr, minReInterval, maxReInterval, runnerError), notifych: listench}
 }
